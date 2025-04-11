@@ -1,0 +1,10 @@
+Package: com.xplo8e.fridactrl
+Name: Frida Ctrl
+Version: 0.0.1
+Depends: re.frida.server
+Architecture: iphoneos-arm
+Description: A simple utility to manage the Frida server port.
+Maintainer: Xplo8E
+Author: Vinay Kumar Rasala (Xplo8E)
+Icon: fridactrl.png
+Section: Utilities

@@ -1,0 +1,21 @@
+#!/bin/bash
+# DEBIAN/postinst script
+
+HELPER_PATH="/var/jb/usr/bin/fridactrlhelper" # Rootless path
+
+# Exit immediately if a command exits with a non-zero status.
+set -e
+
+echo "[postinst] Setting permissions for $HELPER_PATH"
+
+# Ensure correct ownership and basic executable permissions first
+chown root:wheel "$HELPER_PATH"
+chmod 0755 "$HELPER_PATH"
+
+# Set the setuid bit to allow running as root from non-root user
+chmod u+s "$HELPER_PATH"
+# chmod 4755 "$HELPER_PATH" # Alternative combined command
+
+echo "[postinst] Permissions set for $HELPER_PATH"
+
+exit 0
