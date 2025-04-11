@@ -18,4 +18,6 @@ include $(THEOS_MAKE_PATH)/aggregate.mk
 do::
 	actool Resources/Assets.xcassets --compile ./Resources --platform iphoneos  --minimum-deployment-target 8.0 --app-icon AppIcon --launch-image LaunchImage --output-partial-info-plist tmp.plist
 	/usr/libexec/PlistBuddy -x -c "Merge tmp.plist" ./Resources/Info.plist
-	rm tmp.plist
+	rm tmp.plist	
+after-install::
+	install.exec "uicache -a && killall -9 SpringBoard"

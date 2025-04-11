@@ -627,16 +627,22 @@ cleanup_capture: // Label for errors during setup before spawn
              [self fetchCurrentPortStatus];
          } else {
               // Construct error message for UI feedback label
+              NSString *feedbackError = @"Error: Operation failed.";
               NSString *displayError = @"Error: Operation failed.";
-              if (errorString && errorString.length > 0) { // Prefer stderr
-                 displayError = [errorString stringByReplacingOccurrencesOfString:@"[FridaCtrlHelper] Error: " withString:@""];
-                 displayError = [NSString stringWithFormat:@"Error: %@", [displayError stringByTrimmingCharactersInSet:[NSCharacterSet whitespaceAndNewlineCharacterSet]]];
+              if (status == 11) {
+                if (errorString && errorString.length > 0)  {
+                    feedbackError = @"Error: Port is already in use.";  
+                    displayError = [errorString stringByReplacingOccurrencesOfString:@"[FridaCtrlHelper] Error: " withString:@""];
+                    displayError = [NSString stringWithFormat:@"Error: %@", [displayError stringByTrimmingCharactersInSet:[NSCharacterSet whitespaceAndNewlineCharacterSet]]];
+                }
               } else if (outputString && outputString.length > 0) { // Use stdout if stderr empty
+                 feedbackError = [NSString stringWithFormat:@"Info: %@", [outputString stringByTrimmingCharactersInSet:[NSCharacterSet whitespaceAndNewlineCharacterSet]]];
                  displayError = [NSString stringWithFormat:@"Info: %@", [outputString stringByTrimmingCharactersInSet:[NSCharacterSet whitespaceAndNewlineCharacterSet]]];
               } else { // Generic code
+                  feedbackError = [NSString stringWithFormat:@"Error: Failed (Code: %d)", status];
                   displayError = [NSString stringWithFormat:@"Error: Failed (Code: %d)", status];
               }
-              self.feedbackLabel.text = displayError;
+              self.feedbackLabel.text = feedbackError;
               self.feedbackLabel.textColor = [XXRootViewController logTagBadColor];
                [self logMessage:[NSString stringWithFormat:@"[-] %@", displayError]];// Log the error
               // Refresh status even on failure
