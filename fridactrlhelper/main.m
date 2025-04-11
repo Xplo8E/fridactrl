@@ -6,6 +6,10 @@
 #import <sys/stat.h>  // For chmod()
 #import <unistd.h>    // For chown(), close(), getuid(), geteuid()
 #import <spawn.h>     // For posix_spawn()
+#import <sys/socket.h> // For socket functions
+#import <netinet/in.h> // For sockaddr_in
+#import <arpa/inet.h>  // For htons, htonl (maybe included by netinet/in)
+#import <errno.h>      // For errno and EADDRINUSE
 
 // Required by posix_spawn
 extern char **environ;
@@ -18,6 +22,7 @@ NSMutableDictionary* readPlist(NSString* plistPath);
 BOOL writePlist(NSDictionary* dictionary, NSString* plistPath);
 BOOL setPortInPlist(NSString* plistPath, NSString* port);
 BOOL revertDefaultInPlist(NSString* plistPath);
+BOOL isPortInUse(NSString *portString);
 
 
 // --- Main Entry Point ---
@@ -64,6 +69,13 @@ int main(int argc, char *argv[]) {
 				fprintf(stderr, "[FridaCtrlHelper] Error: Invalid port '%s'.\n", argv[2]); 
 				return 4; 
 			}
+            NSLog(@"[FridaCtrlHelper] Checking if port %@ is already in use...", portString);
+            if (isPortInUse(portString)) {
+                fprintf(stderr, "[FridaCtrlHelper] Error: Port %s is already in use.\n", [portString UTF8String]);
+                // Use a new, distinct error code for port in use
+                return 11;
+            }
+            NSLog(@"[FridaCtrlHelper] Port %@ appears to be free.", portString);
             NSLog(@"[FridaCtrlHelper] Action: Set Port to %@", portString);
             plistActionResult = setPortInPlist(plistPath, portString);
             needsReload = YES;
@@ -126,6 +138,56 @@ int main(int argc, char *argv[]) {
 
 
 // --- Function Implementations ---
+
+// Checks if a given TCP port is actively listening by attempting to bind.
+// Returns YES if port is in use (bind fails with EADDRINUSE), NO otherwise.
+BOOL isPortInUse(NSString *portString) {
+    int portNumber = [portString intValue];
+    if (portNumber <= 0 || portNumber > 65535) {
+        fprintf(stderr, "Internal Error: Invalid port %d for check.\n", portNumber);
+        return NO; // Assume not in use if invalid port passed internally
+    }
+
+    int sockfd = -1;
+    BOOL isInUse = NO;
+
+    NSLog(@"[FridaCtrlHelper] Checking port %d availability...", portNumber);
+    sockfd = socket(AF_INET, SOCK_STREAM, 0);
+    if (sockfd < 0) {
+        // Log warning but assume port is available if check fails
+        perror("[FridaCtrlHelper] Warning: Socket creation failed during port check");
+        return NO;
+    }
+
+    struct sockaddr_in addr;
+    memset(&addr, 0, sizeof(addr));
+    addr.sin_family = AF_INET;
+    addr.sin_port = htons(portNumber);
+    addr.sin_addr.s_addr = htonl(INADDR_ANY); // 0.0.0.0
+
+    // Attempt to bind
+    if (bind(sockfd, (struct sockaddr *)&addr, sizeof(addr)) < 0) {
+        if (errno == EADDRINUSE) {
+            NSLog(@"[FridaCtrlHelper] Result: Port %d IS IN USE (EADDRINUSE)", portNumber);
+            isInUse = YES; // <<< Port is confirmed in use
+        } else {
+            // Log other bind errors but treat as "not in use" for check purposes
+            NSLog(@"[FridaCtrlHelper] Result: Port %d likely free (bind failed: %s)", portNumber, strerror(errno));
+            isInUse = NO;
+        }
+    } else {
+        // Bind succeeded means port was free
+        NSLog(@"[FridaCtrlHelper] Result: Port %d IS FREE (bind succeeded)", portNumber);
+        isInUse = NO;
+    }
+
+    // Cleanup the temporary socket
+    if (sockfd >= 0) {
+        close(sockfd);
+    }
+
+    return isInUse;
+}
 
 // Simpler posix_spawn wrapper, just runs command and returns exit status.
 // Returns -1 if spawn/wait fails, otherwise the command's exit status.
